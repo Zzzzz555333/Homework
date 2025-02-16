@@ -1,171 +1,71 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body {
-            max-width: 800px;
-            margin: 20px auto;
-            font-family: Arial, sans-serif;
-        }
-        .controls {
-            margin-bottom: 20px;
-            display: flex;
-            gap: 10px;
-        }
-        input {
-            padding: 8px;
-            width: 120px;
-        }
-        button {
-            padding: 8px 15px;
-            cursor: pointer;
-            background: #2196F3;
-            color: white;
-            border: none;
-            border-radius: 4px;
-        }
-        .container {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-        }
-        .column {
-            border: 2px solid #ddd;
-            padding: 15px;
-            min-height: 300px;
-            border-radius: 8px;
-        }
-        .student {
-            display: inline-block;
-            padding: 8px 12px;
-            margin: 4px;
-            background: #f0f0f0;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: 0.1s;
-        }
-        .student:hover {
-            filter: brightness(0.95);
-        }
-        #unsubmitted .student { border: 2px solid #9E9E9E; }
-        #correct .student { background: #4CAF50; color: white; }
-        #need-correct .student { background: #FF9800; color: white; }
-        .summary {
-            margin-top: 20px;
-            padding: 15px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-        }
-    </style>
-</head>
-<body>
-    <div class="controls">
-        <input type="number" id="total" placeholder="班级人数" min="1">
-        <button onclick="init()">生成学号</button>
-        <button onclick="undo()" id="undoBtn" disabled>撤销</button>
-        <button onclick="showSummary()">生成报告</button>
-    </div>
+import tkinter as tk
+from tkinter import messagebox
 
-    <div class="container">
-        <div class="column" id="unsubmitted">
-            <h3>📭 未交作业</h3>
-            <div id="unsubmittedList"></div>
-        </div>
-        <div class="column" id="correct">
-            <h3>✅ 全对</h3>
-            <div id="correctList"></div>
-        </div>
-        <div class="column" id="need-correct">
-            <h3>✏️ 需订正</h3>
-            <div id="needCorrectList"></div>
-        </div>
-    </div>
+class NumberGame:
+    def __init__(self, master, num_students):
+        self.master = master
+        self.num_students = num_students
+        self.students = ['未交'] * num_students  # 初始化所有学号为“未交”
+        self.buttons = []
+        self.history = []  # 用来记录操作历史，支持回撤功能
+        self.create_widgets()
 
-    <div class="summary" id="summary"></div>
+    def create_widgets(self):
+        self.master.title("学号消消乐")
+        
+        # 创建显示各学号状态的按钮
+        for i in range(self.num_students):
+            button = tk.Button(self.master, text=f"学号{i+1}\n{self.students[i]}", 
+                               command=lambda i=i: self.change_status(i), width=20, height=3)
+            button.grid(row=i // 5, column=i % 5)
+            self.buttons.append(button)
+        
+        # 创建回撤按钮
+        self.undo_button = tk.Button(self.master, text="回撤", command=self.undo, width=20, height=3)
+        self.undo_button.grid(row=(self.num_students // 5) + 1, column=0, columnspan=5)
+        
+        # 创建总结按钮
+        self.summary_button = tk.Button(self.master, text="生成总结", command=self.generate_summary, width=20, height=3)
+        self.summary_button.grid(row=(self.num_students // 5) + 2, column=0, columnspan=5)
 
-    <script>
-        let students = [];
-        let history = [];
+    def change_status(self, i):
+        """更改学号状态: 未交 -> 全对 -> 需订正"""
+        if self.students[i] == '未交':
+            new_status = '全对'
+        elif self.students[i] == '全对':
+            new_status = '需订正'
+        else:
+            new_status = '未交'
+        
+        # 保存当前状态到历史记录
+        self.history.append(self.students[:])  # 保存当前状态的快照
+        self.students[i] = new_status
+        self.update_buttons()
 
-        function init() {
-            const total = parseInt(document.getElementById('total').value) || 0;
-            if (total < 1) return alert('请输入有效人数');
-            
-            students = Array.from({length: total}, (_, i) => ({
-                id: i + 1,
-                status: 'unsubmitted'
-            }));
-            
-            history = [JSON.stringify(students)];
-            document.getElementById('undoBtn').disabled = true;
-            render();
-        }
+    def undo(self):
+        """回撤到上一步"""
+        if self.history:
+            self.students = self.history.pop()
+            self.update_buttons()
+        else:
+            messagebox.showinfo("提示", "没有更多的操作历史可以回撤!")
 
-        function handleClick(student) {
-            const prevState = JSON.stringify(students);
-            
-            if (student.status === 'unsubmitted') {
-                student.status = 'correct';
-            } else if (student.status === 'correct') {
-                student.status = 'need-correct';
-            } else {
-                student.status = 'unsubmitted';
-            }
-            
-            history.push(prevState);
-            document.getElementById('undoBtn').disabled = false;
-            render();
-        }
+    def generate_summary(self):
+        """生成总结并显示"""
+        summary = {"未交": 0, "全对": 0, "需订正": 0}
+        for status in self.students:
+            summary[status] += 1
+        
+        messagebox.showinfo("学号总结", f"未交: {summary['未交']}\n全对: {summary['全对']}\n需订正: {summary['需订正']}")
 
-        function undo() {
-            if (history.length > 1) {
-                history.pop();
-                students = JSON.parse(history[history.length-1]);
-                document.getElementById('undoBtn').disabled = history.length === 1;
-                render();
-            }
-        }
+    def update_buttons(self):
+        """更新界面上的按钮文本"""
+        for i, button in enumerate(self.buttons):
+            button.config(text=f"学号{i+1}\n{self.students[i]}")
+        
 
-        function render() {
-            const containers = {
-                unsubmitted: document.getElementById('unsubmittedList'),
-                correct: document.getElementById('correctList'),
-                'need-correct': document.getElementById('needCorrectList')
-            };
-
-            // 清空容器
-            Object.values(containers).forEach(div => div.innerHTML = '');
-
-            // 分组渲染
-            students.forEach(student => {
-                const div = document.createElement('div');
-                div.className = 'student';
-                div.textContent = student.id;
-                div.onclick = () => handleClick(student);
-                
-                if (student.status !== 'unsubmitted') {
-                    div.style.pointerEvents = 'none';
-                }
-                
-                containers[student.status].appendChild(div);
-            });
-        }
-
-        function showSummary() {
-            const groups = students.reduce((acc, cur) => {
-                acc[cur.status === 'unsubmitted' ? 'unsubmitted' : 
-                    cur.status === 'correct' ? 'correct' : 'need-correct'].push(cur.id);
-                return acc;
-            }, { 'unsubmitted': [], 'correct': [], 'need-correct': [] });
-
-            const html = `
-                <h3>📊 最终统计</h3>
-                <p>📭 未交：${groups.unsubmitted.join(', ') || '无'}</p >
-                <p>✅ 全对：${groups.correct.join(', ') || '无'}</p >
-                <p>✏️ 需订正：${groups['need-correct'].join(', ') || '无'}</p >
-            `;
-            document.getElementById('summary').innerHTML = html;
-        }
-    </script>
-</body>
-</html>
+if __name__ == "__main__":
+    root = tk.Tk()
+    num_students = int(input("请输入班级人数: "))
+    game = NumberGame(root, num_students)
+    root.mainloop()
